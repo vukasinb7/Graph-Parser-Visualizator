@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block canvas_block %}
+    <style>
+
+        .node {
+            cursor: pointer;
+            color: #3182bd;
+            word-wrap: break-word;
+
+        }
+
+        .link {
+            fill: none;
+            stroke: white;
+            stroke-width: 2.5px;
+        }
+
+    </style>
+    <script type="text/javascript" src="https://d3js.org/d3.v3.js"></script>
+    <script>
+        function nodeClick(el) {
+            alert("ID: " + el.id);
+        }
+    </script>
+
+    <script>
+        var nodes = {
+            {% for node in graph.nodes.all %}
+                {% if node.is_visible == True %}
+                    "{{node.node_id}}": {
+                        id: "{{node.node_id}}", name: "{{ node.name }}", data: [
+                            {% for kv in node.data.all %}
+                                {key: "{{kv.key}}", value: "{{kv.value}}"},
+                            {% endfor %}
+                        ]
+                    },
+                {% endif %}
+
+            {% endfor %}
+        }
+        let edges = [
+            {% for edge in graph.edges.all %}
+                {% if edge.is_visible == True %}
+                    {source: "{{edge.first_node.node_id}}", target: "{{edge.second_node.node_id}}"},
+                {% endif %}
+            {% endfor %}
+        ]
+        let DELTA = 6;
+        let startX;
+        let startY;
+
+
+        edges.forEach(function (link) {
+            link.source = nodes[link.source];
+            link.target = nodes[link.target];
+        });
+        const width = document.getElementById("canvas-simple").clientWidth;
+        const height = document.getElementById("canvas-simple").clientHeight;
+        var svg = d3.select('svg').append("g");
+
+        var force = d3.layout.force() //kreiranje force layout-a
+            .size([width, height]) //raspoloziv prostor za iscrtavanje
+            .nodes(d3.values(nodes)) //dodaj nodove
+            .links(edges) //dodaj linkove
+            .on("tick", tick) //sta treba da se desi kada su izracunate nove pozicija elemenata
+            .linkDistance(700)
+            .linkStrength(5)
+            .charge(-1550).start();//pokreni izracunavanje pozicija
+
+
+        // add the links
+        var link = svg.selectAll('.link')
+            .data(edges)
+            .enter().append('line')
+            .attr('class', 'link');
+
+        // add the nodes
+        var node = svg.selectAll('.node')
+            .data(force.nodes()) //add
+            .enter().append('g')
+            .attr('class', 'node')
+            .attr('id', function (d) {
+                return d.id;
+            })
+            .on('mousedown', function (event) {
+                startX = event.px;
+                startY = event.py;
+            })
+            .on('mouseup', function (event) {
+                const diffX = Math.abs(event.px - startX);
+                const diffY = Math.abs(event.py - startY);
+                if (diffX < DELTA && diffY < DELTA) {
+                    nodeClick(this);
+                }
+            });
+
+        d3.selectAll('.node').each(function (d) {
+            slozenPrikaz(d);
+        });
+
+
+        function slozenPrikaz(d) {
+            var duzina = 200;
+            var brKategorija = d.data.length;//Object.keys(d.data).length;
+
+            var textSize = 15;
+            var visina = (brKategorija == 0) ? textSize : brKategorija * textSize;
+            visina += textSize;
+
+            //Ubacivanje kvadrata
+            d3.select("g[id='" + d.id + "']").append('rect').attr('x', 0).attr('y', 0).attr('width', duzina).attr('height', visina + 25)
+                .attr('fill', '#e5b409');
+
+            //id insert
+            d3.select("g[id='" + d.id + "']").append('text').attr('x', duzina / 2).attr('y', 12)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', textSize).attr('font-family', 'sans-serif')
+                .attr('fill', 'black').html(d.name + " - " + d.id);
+
+            //Ubacivanje razdelnika
+            d3.select("g[id='" + d.id + "']").append('line').attr('x1', 0).attr('y1', textSize).attr('x2', duzina).attr('y2', textSize)
+                .attr('stroke', 'black').attr('stroke-width', 2);
+            //Ubacivanje teksta za kategorije
+            console.log(d.data)
+            let additional = 1
+            for (let i = 0; i < d.data.length; i++) {
+                //Ubacivanje naziva prodavnice ili artikla
+
+                let offset = i + additional - 1
+                if (i > 1)
+                    offset = offset - i + 1;
+
+                d3.select("g[id='" + d.id + "']").append('text').attr('x', 3).attr('y', 30 + offset * (textSize + 2))
+                    .attr('text-anchor', 'start')
+                    .attr('font-size', textSize).attr('font-family', 'sans-serif')
+                    .attr('fill', 'black').html(d.data[i].key + ":" + d.data[i].value).call(wrap, duzina);
+
+                additional = d3.selectAll("g[id='" + d.id + "'] text *").size();
+                d3.select("g[id='" + d.id + "'] rect").attr('height', 30 + additional * (textSize + 7));
+            }
+        }
+
+        function wrap(text, width) {
+            text.each(function () {
+                var text = d3.select(this),
+                    words = text.text().split(/\s+/).reverse(),
+                    word,
+                    line = [],
+                    lineNumber = 0,
+                    lineHeight = 1.1, // ems
+                    x = text.attr("x"),
+                    y = text.attr("y"),
+                    dy = 0, //parseFloat(text.attr("dy")),
+                    tspan = text.text(null)
+                        .append("tspan")
+                        .attr("x", x)
+                        .attr("y", y)
+                        .attr("dy", dy + "em");
+                while (word = words.pop()) {
+                    line.push(word);
+                    tspan.text(line.join(" "));
+                    if (tspan.node().getComputedTextLength() > width) {
+                        line.pop();
+                        tspan.text(line.join(" "));
+                        line = [word];
+                        tspan = text.append("tspan")
+                            .attr("x", x)
+                            .attr("y", y)
+                            .attr("dy", ++lineNumber * lineHeight + dy + "em")
+                            .text(word);
+                    }
+                }
+            });
+        }
+
+
+        function tick(e) {
+
+            node.attr("transform", function (d) {
+                return "translate(" + d.x + "," + d.y + ")";
+            })
+                .call(force.drag);
+
+            link.attr('x1', function (d) {
+                return d.source.x;
+            })
+                .attr('y1', function (d) {
+                    return d.source.y;
+                })
+                .attr('x2', function (d) {
+                    return d.target.x;
+                })
+                .attr('y2', function (d) {
+                    return d.target.y;
+                });
+            d3.selectAll("#canvas-simple g g").on("mousedown", function () {
+                d3.event.stopImmediatePropagation();
+            })
+
+        }
+
+
+    </script>
+
+{% endblock %}

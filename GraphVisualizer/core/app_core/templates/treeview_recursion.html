@@ -1,0 +1,92 @@
+<script>
+    let nodeList = {
+        {% for node in graph.nodes.all %}
+            "{{node.node_id}}": {
+                id: "{{node.node_id}}",
+                name: "{{node.name}}"
+            },
+        {% endfor %}
+    };
+
+    let edgeList = [
+        {% for edge in graph.edges.all %}
+            {source: "{{edge.first_node.node_id}}", target: "{{edge.second_node.node_id}}"},
+        {% endfor %}
+    ];
+
+    let rootNodes = [
+        {% for node in root_nodes %}
+            {
+                id: "{{node.node_id}}",
+                name: "{{node.name}}"
+            },
+        {% endfor %}
+    ];
+
+    let parentID = "{{ parent_id }}";
+
+    let idCounter = 0;
+
+    function createTreeView(node, id) {
+        let parentTag = document.getElementById(id);
+        let children = getChildren(node.id);
+
+        if (children.length === 0) {
+            let liTag = document.createElement("li");
+            liTag.innerHTML = node.name + " - " + node.id;
+            parentTag.appendChild(liTag);
+        } else {
+            let liTag = document.createElement("li");
+            let span = document.createElement("span");
+            span.classList.add("caret");
+            span.innerHTML = node.name + " - " + node.id;
+            parentTag.appendChild(liTag);
+            liTag.appendChild(span);
+
+            span.addEventListener("click", function (e) {
+                if (span.classList.contains("caret-down")) {
+                    span.classList.remove("caret-down");
+                    liTag.lastChild.classList.remove("active");
+                    return;
+                }
+                span.classList.add("caret-down");
+
+                let ul = liTag.lastChild;
+                if (ul.tagName === "UL") {
+                    ul.classList.add("active");
+                } else {
+                    let id = idCounter;
+                    idCounter++;
+                    let ul = document.createElement("ul");
+                    ul.classList.add("nested", "active");
+                    ul.setAttribute("id", "node_" + id);
+                    liTag.appendChild(ul);
+
+                    children.forEach((child) => {
+                        createTreeView(child, "node_" + id);
+                    })
+                }
+            });
+        }
+    }
+
+    function getChildren(id) {
+        let childrenIds = []
+        let children = []
+        edgeList.forEach((edge) => {
+            if (edge.source === id) {
+                childrenIds.push(edge.target);
+            }
+        })
+
+        childrenIds.forEach((id) => {
+            children.push(nodeList[id]);
+        })
+
+        return children;
+    }
+
+    rootNodes.forEach((rootNode) => {
+          createTreeView(rootNode, parentID);
+    })
+</script>

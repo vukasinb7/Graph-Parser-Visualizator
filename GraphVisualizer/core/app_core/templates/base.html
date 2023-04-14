@@ -1,0 +1,88 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    {% load static %}
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'style.css' %}"/>
+</head>
+<body>
+<div class="display-grid">
+    <nav class="navigation">
+        <div class="invisible-container"></div>
+        {% if visualization_plugins %}
+            {% for plugin in visualization_plugins %}
+                <input id="{{ plugin.0 }}" type="button" value="{{ plugin.1 }}" class="nav-item"/>
+            {% endfor %}
+        {% else %}
+            <p>No visualization plugin loaded</p>
+        {% endif %}
+        {% if parser_plugins %}
+            <div class="form-container">
+                <div class="loaded_parsers">
+                    {% for key, value in parser_plugins.items %}
+                        <p>{{ value.name }}</p>
+                    {% endfor %}
+                </div>
+                <form class="file-upload-form" method="post" enctype="multipart/form-data" action="/upload">
+                    {% csrf_token %}
+                    <input id="upload-input" type="file" name="file" required>
+                    <button class="submit-btn" type="submit">Upload</button>
+                </form>
+            </div>
+        {% else %}
+            <p style="color:white;margin-right: 5px">No parser plugin loaded</p>
+        {% endif %}
+    </nav>
+    <div class="file-explorer">
+        {% if root_nodes %}
+            {% load filters %}
+            <ul id="parentUL">
+                {% include "treeview_recursion.html" with graph=graph root_nodes=root_nodes parent_id="parentUL" %}
+            </ul>
+        {% else %}
+            <p style="color:white;padding-left:5px">No graph loaded</p>
+        {% endif %}
+    </div>
+    <div class="canvas" id="main-canvas-div">
+        <svg class="canvas-visualization" id="canvas-simple" width="100%" height="100%">
+        </svg>
+        {% block canvas_block %}{% endblock %}
+    </div>
+    <div class="bird-view">
+        <svg id="canvas-birdview" width="100%" height="100%">
+            <g id="main"></g>
+        </svg>
+    </div>
+    <div class="console">
+        <textarea spellcheck="false" readonly id="console-content"></textarea>
+        <input type="text" spellcheck="false" id="console-command"/>
+        <span class="arrow">></span>
+    </div>
+</div>
+</body>
+<script>
+    let current_view = null;
+    {% for plugin in visualization_plugins %}
+        document.getElementById("{{plugin.0}}").addEventListener('click', function (e) {
+            current_view = "{{plugin.0}}";
+            location.href = "/layout/{{plugin.0}}";
+        })
+    {% endfor %}
+</script>
+<script src='https://d3js.org/d3.v3.min.js'></script>
+<script src="{% static 'pan_zoom.js' %}"></script>
+<script src="{% static 'base_script.js' %}"></script>
+<script src="{% static 'birdview.js' %}"></script>
+<script src="{% static 'treeview.js' %}"></script>
+<script>
+    let types = ""
+    {% for key, value in parser_plugins.items %}
+        types += "{{ value.type }}/{{value.ext}}, "
+    {% endfor %}
+    types = types.slice(0, -2);
+
+    document.getElementById("upload-input").accept = types;
+</script>
+
+</html>
